@@ -66,9 +66,14 @@ app.post('/api/chatwoot', async (req, res) => {
     
     console.log(`[${requestId}] Processing ${event} event, message type: ${message_type}`);
     
-    // Only respond to incoming user messages
-    if (event !== 'message_created' || message_type !== 'incoming') {
-      console.log(`[${requestId}] Skipping non-user message: ${event}, ${message_type}`);
+    // Only respond to incoming user messages OR outgoing messages from sender ID 1
+    const shouldRespond = event === 'message_created' && (
+      message_type === 'incoming' || 
+      (message_type === 'outgoing' && conversation?.sender?.id === 1)
+    );
+    
+    if (!shouldRespond) {
+      console.log(`[${requestId}] Skipping message: ${event}, ${message_type}, sender: ${conversation?.sender?.id}`);
       return;
     }
     
