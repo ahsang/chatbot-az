@@ -53,6 +53,37 @@ const getConversationHistory = (conversationId) => {
   return conversationHistory[conversationId] || [];
 };
 
+// Function to toggle typing indicator in Chatwoot
+async function toggleTypingIndicator(conversation, account, status, requestId) {
+  if (!conversation?.id || !account?.id) {
+    console.log(`[${requestId}] Cannot toggle typing indicator: missing conversation or account data`);
+    return;
+  }
+
+  const chatwootApiKey = process.env.CHATWOOT_API_KEY;
+  if (!chatwootApiKey) {
+    console.log(`[${requestId}] Cannot toggle typing indicator: missing API key`);
+    return;
+  }
+
+  try {
+    const typingUrl = `${process.env.CHATWOOT_BASE_URL || 'https://app.chatwoot.com'}/api/v1/accounts/${account.id}/conversations/${conversation.id}/toggle_typing_status`;
+    console.log(`[${requestId}] Turning ${status} typing indicator`);
+    await axios.post(typingUrl, {
+      typing_status: status
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'api_access_token': chatwootApiKey
+      }
+    });
+    console.log(`[${requestId}] Typing indicator turned ${status}`);
+  } catch (error) {
+    console.error(`[${requestId}] Error toggling typing indicator:`, error.message);
+    // Continue processing even if typing indicator fails
+  }
+}
+
 // CoverageX API Functions
 async function getMakesForYear(year) {
   try {
@@ -120,7 +151,10 @@ app.post('/api/chatwoot', async (req, res) => {
     }
     
     console.log(`[${requestId}] Processing user message: "${content?.substring(0, 50)}${content?.length > 50 ? '...' : ''}"`);
-    
+
+    // Turn ON typing indicator
+    await toggleTypingIndicator(conversation, account, 'on', requestId);
+
     // Get conversation history
     const history = getConversationHistory(conversation?.id);
     console.log(`[${requestId}] Retrieved ${history.length} previous messages for conversation ${conversation?.id}`);
@@ -442,15 +476,18 @@ Alsways keep your responses less than 150 words
 
     // Store the final AI response in history
     storeMessageInHistory(conversation?.id, 'assistant', response);
-    
+
+    // Turn OFF typing indicator before sending message
+    await toggleTypingIndicator(conversation, account, 'off', requestId);
+
     // Send message to Chatwoot via API
     if (conversation?.id && account?.id) {
       const chatwootApiKey = process.env.CHATWOOT_API_KEY;
-      
+
       if (!chatwootApiKey) {
         throw new Error('CHATWOOT_API_KEY environment variable not set');
       }
-      
+
       console.log(`[${requestId}] Sending response to Chatwoot conversation ${conversation.id}`);
       
       const apiUrl = `${process.env.CHATWOOT_BASE_URL || 'https://app.chatwoot.com'}/api/v1/accounts/${account.id}/conversations/${conversation.id}/messages`;
@@ -515,6 +552,10 @@ Alsways keep your responses less than 150 words
     console.log(`[${requestId}] Request completed in ${Date.now() - startTime}ms`);
   } catch (error) {
     console.error(`[${requestId}] Error processing webhook:`, error);
+
+    // Turn OFF typing indicator on error
+    const { conversation, account } = req.body;
+    await toggleTypingIndicator(conversation, account, 'off', requestId);
   }
 });
 
