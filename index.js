@@ -287,6 +287,7 @@ Which plan gives you the peace of mind you're looking for?"
 
 Remember: Your goal is to educate, build value, and guide them to purchase with confidence. Most customers choose Preferred Plan - it's the sweet spot for comprehensive protection at a great price!
 DO NOT ANSWER ABOUT ANYTHING ELSE OTHER THAN WHAT IS STATED ABOVE, YOUR JOB IS TO GET THE USER TOWARDS BUYING COVERAGE
+Alsways keep your responses less than 150 words
 `;
     
     // Define OpenAI tools for function calling
