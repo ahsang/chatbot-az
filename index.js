@@ -257,7 +257,7 @@ Present all three plans with DISCOUNTED prices:
 2. Recommend Preferred Plan as "most popular" and "best value"
 3. Highlight what they'd be missing with Essential (expensive mechanical repairs)
 4. Emphasize Premium for newer cars with technology features
-5. Always mention phone discount: "Call our team at [PHONE] to unlock the deepest savings"
+5. Always mention phone discount: "Call our team at 1-800-258-3413 to unlock the deepest savings"
 6. If hesitant, remind them: "No long-term contract - cancel anytime"
 
 ## State Coverage:
