@@ -29,6 +29,7 @@ The entire application is contained in `index.js` (430 lines). This is a simple 
 - Immediately acknowledges (200) then processes asynchronously
 - Filters messages: only responds to incoming user messages OR outgoing from sender ID 1
 - Skips responses when conversation is assigned to a human agent
+- **Typing Indicator**: Turns ON when processing starts, OFF before sending response
 - Uses OpenAI function calling to fetch vehicle data dynamically
 - Handles multi-turn tool execution loop
 - Sends responses back via Chatwoot API
@@ -59,23 +60,32 @@ Two tools defined for vehicle data lookup:
 - Handles state coverage and unsupported states
 - Override via `SYSTEM_PROMPT` environment variable
 
+**Typing Indicator Function** (lines 56-85):
+- `toggleTypingIndicator(conversation, account, status, requestId)`
+- Uses dedicated `CHATWOOT_TYPING_API_KEY` or falls back to `CHATWOOT_API_KEY`
+- Logs which API key type is being used (dedicated vs fallback)
+- Fails gracefully without disrupting message flow
+- Turned ON at start of processing, OFF before sending response, OFF on error
+
 **Response Flow with Function Calling**:
 1. Webhook received → immediate 200 response
 2. Validate message type and agent assignment
-3. Retrieve conversation history (last 20 messages, including tool calls)
-4. Build messages array: system prompt + history + current message
-5. Call OpenAI API with tools
-6. **Tool Execution Loop** (lines 254-327):
+3. **Turn ON typing indicator**
+4. Retrieve conversation history (last 20 messages, including tool calls)
+5. Build messages array: system prompt + history + current message
+6. Call OpenAI API with tools
+7. **Tool Execution Loop** (lines 254-327):
    - If assistant requests tool calls, execute them
    - Store assistant message with tool_calls
    - Execute each function (get_vehicle_makes or get_vehicle_models)
    - Store tool responses with tool_call_id
    - Call OpenAI again with tool results
    - Repeat until no more tool calls
-7. Store final assistant response
-8. Send to Chatwoot via API
-9. Optionally set conversation status to "open"
-10. Log interaction if enabled
+8. Store final assistant response
+9. **Turn OFF typing indicator**
+10. Send to Chatwoot via API
+11. Optionally set conversation status to "open"
+12. Log interaction if enabled
 
 ### Key Behavioral Logic
 
@@ -102,6 +112,7 @@ Required variables:
 - `CHATWOOT_BASE_URL` - Chatwoot instance URL
 
 Optional (with defaults):
+- `CHATWOOT_TYPING_API_KEY` - Dedicated API key for typing indicator (falls back to `CHATWOOT_API_KEY` if not set)
 - `COVERAGEX_API_REF` - Default: `1f0aad9b-1372-636e-bab7-000d3a8ab96a` (API reference token)
 - `SYSTEM_PROMPT` - Default: CoverageX sales assistant prompt in index.js
 - `OPENAI_MODEL` - Default: `gpt-4o-mini`

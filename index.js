@@ -60,7 +60,8 @@ async function toggleTypingIndicator(conversation, account, status, requestId) {
     return;
   }
 
-  const chatwootApiKey = process.env.CHATWOOT_API_KEY;
+  // Use dedicated typing indicator API key, fallback to main API key if not set
+  const chatwootApiKey = process.env.CHATWOOT_TYPING_API_KEY || process.env.CHATWOOT_API_KEY;
   if (!chatwootApiKey) {
     console.log(`[${requestId}] Cannot toggle typing indicator: missing API key`);
     return;
@@ -68,7 +69,7 @@ async function toggleTypingIndicator(conversation, account, status, requestId) {
 
   try {
     const typingUrl = `${process.env.CHATWOOT_BASE_URL || 'https://app.chatwoot.com'}/api/v1/accounts/${account.id}/conversations/${conversation.id}/toggle_typing_status`;
-    console.log(`[${requestId}] Turning ${status} typing indicator`);
+    console.log(`[${requestId}] Turning ${status} typing indicator (using ${process.env.CHATWOOT_TYPING_API_KEY ? 'dedicated' : 'fallback'} API key)`);
     await axios.post(typingUrl, {
       typing_status: status
     }, {
