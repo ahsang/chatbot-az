@@ -102,7 +102,14 @@ async function toggleTypingIndicator(conversation, account, status, requestId) {
 async function getMakesForYear(year) {
   try {
     const response = await axios.get(`${COVERAGEX_API_BASE}/years/${year}/makes`, {
-      params: { ref: COVERAGEX_API_REF }
+      params: { ref: COVERAGEX_API_REF },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://coveragex.com/',
+        'Origin': 'https://coveragex.com'
+      }
     });
     return response.data;
   } catch (error) {
@@ -114,7 +121,14 @@ async function getMakesForYear(year) {
 async function getModelsForMake(year, make) {
   try {
     const response = await axios.get(`${COVERAGEX_API_BASE}/years/${year}/makes/${encodeURIComponent(make)}/models`, {
-      params: { ref: COVERAGEX_API_REF }
+      params: { ref: COVERAGEX_API_REF },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://coveragex.com/',
+        'Origin': 'https://coveragex.com'
+      }
     });
     return response.data;
   } catch (error) {
