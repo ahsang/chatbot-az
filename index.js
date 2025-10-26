@@ -18,6 +18,19 @@ const openai = new OpenAI({
 const COVERAGEX_API_BASE = 'https://coveragex.com/api';
 const COVERAGEX_API_REF = process.env.COVERAGEX_API_REF || '1f0aad9b-1372-636e-bab7-000d3a8ab96a';
 
+// MBH API Configuration
+const MBH_API_BASE = process.env.MBH_API_BASE || 'https://sandbox.ncwcinc.com/crm';
+const MBH_API_ID = process.env.MBH_API_ID || 'MB1910E6F';
+const MBH_API_KEY = process.env.MBH_API_KEY || '4aad0cb8-a09c-4fce-832f-ff6b2e2d754b';
+
+// Helper function to create MBH API headers
+function getMBHHeaders() {
+  return {
+    'Authorization': `Bearer {"id":"${MBH_API_ID}","key":"${MBH_API_KEY}"}`,
+    'Content-Type': 'application/json'
+  };
+}
+
 // In-memory conversation history store
 const conversationHistory = {};
 
@@ -106,6 +119,125 @@ async function getModelsForMake(year, make) {
     return response.data;
   } catch (error) {
     console.error(`Error fetching models for ${year} ${make}:`, error.message);
+    throw error;
+  }
+}
+
+// MBH API Functions for Quotes and Contracts
+
+// Store quote references per conversation
+const quoteReferences = {};
+
+async function lookupVehicleByVIN(vin) {
+  try {
+    const response = await axios.get(`${MBH_API_BASE}`, {
+      params: {
+        lookup: 'vehicle',
+        key: 'vin',
+        keyValue: vin
+      },
+      headers: getMBHHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error looking up VIN ${vin}:`, error.message);
+    throw error;
+  }
+}
+
+async function getQuoteYears(state) {
+  try {
+    const response = await axios.get(`${MBH_API_BASE}`, {
+      params: {
+        quote: 'years',
+        state: state
+      },
+      headers: getMBHHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error getting quote years for state ${state}:`, error.message);
+    throw error;
+  }
+}
+
+async function getQuoteMakes(ref, year, state = null) {
+  try {
+    const params = {
+      quote: 'makes',
+      ref: ref,
+      year: year
+    };
+    if (state) params.state = state;
+
+    const response = await axios.get(`${MBH_API_BASE}`, {
+      params: params,
+      headers: getMBHHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error getting quote makes:`, error.message);
+    throw error;
+  }
+}
+
+async function getQuoteModels(ref, make) {
+  try {
+    const response = await axios.get(`${MBH_API_BASE}`, {
+      params: {
+        quote: 'models',
+        ref: ref,
+        make: make
+      },
+      headers: getMBHHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error getting quote models:`, error.message);
+    throw error;
+  }
+}
+
+async function getQuotePlan(ref, model, modelClass, vinPattern, odometer) {
+  try {
+    const response = await axios.get(`${MBH_API_BASE}`, {
+      params: {
+        quote: 'plan',
+        ref: ref,
+        model: model,
+        class: modelClass,
+        vinPattern: vinPattern,
+        odometer: odometer
+      },
+      headers: getMBHHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error getting quote plan:`, error.message);
+    throw error;
+  }
+}
+
+async function submitQuote(quoteData) {
+  try {
+    const response = await axios.put(`${MBH_API_BASE}/quote`, quoteData, {
+      headers: getMBHHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error submitting quote:`, error.message);
+    throw error;
+  }
+}
+
+async function processDeposit(depositData) {
+  try {
+    const response = await axios.post(`${MBH_API_BASE}/deposit`, depositData, {
+      headers: getMBHHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error processing deposit:`, error.message);
     throw error;
   }
 }
@@ -364,6 +496,96 @@ Alsways keep your responses less than 150 words
             required: ["year", "make"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_detailed_quote",
+          description: "Get a detailed insurance quote with pricing after collecting year, make, model, odometer, and state. This initiates the full quote process with the MBH API.",
+          parameters: {
+            type: "object",
+            properties: {
+              state: {
+                type: "string",
+                description: "Two-character state code where the vehicle is registered (e.g., 'CA', 'NY', 'TX')"
+              },
+              year: {
+                type: "string",
+                description: "Vehicle year"
+              },
+              make: {
+                type: "string",
+                description: "Vehicle make"
+              },
+              model: {
+                type: "string",
+                description: "Vehicle model name"
+              },
+              trim: {
+                type: "string",
+                description: "Vehicle trim level"
+              },
+              modelClass: {
+                type: "string",
+                description: "Vehicle model class number from the models list"
+              },
+              vinPattern: {
+                type: "string",
+                description: "VIN pattern from the models list"
+              },
+              odometer: {
+                type: "string",
+                description: "Current odometer reading (numbers only)"
+              }
+            },
+            required: ["state", "year", "make", "model", "modelClass", "vinPattern", "odometer"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "create_contract",
+          description: "Create a contract after the customer agrees to the quote and provides payment information. Requires customer details, vehicle info, and payment info.",
+          parameters: {
+            type: "object",
+            properties: {
+              firstName: {
+                type: "string",
+                description: "Customer's first name"
+              },
+              lastName: {
+                type: "string",
+                description: "Customer's last name"
+              },
+              email: {
+                type: "string",
+                description: "Customer's email address"
+              },
+              phone: {
+                type: "string",
+                description: "Customer's primary phone number (numbers only)"
+              },
+              address: {
+                type: "string",
+                description: "Customer's street address"
+              },
+              city: {
+                type: "string",
+                description: "Customer's city"
+              },
+              state: {
+                type: "string",
+                description: "Customer's state (2-character code)"
+              },
+              zip: {
+                type: "string",
+                description: "Customer's ZIP code"
+              }
+            },
+            required: ["firstName", "lastName", "email", "phone", "address", "city", "state", "zip"]
+          }
+        }
       }
     ];
 
@@ -431,10 +653,57 @@ Alsways keep your responses less than 150 words
           } else if (functionName === 'get_vehicle_models') {
             const models = await getModelsForMake(functionArgs.year, functionArgs.make);
             functionResponse = JSON.stringify(models);
+          } else if (functionName === 'get_detailed_quote') {
+            // Multi-step quote process
+            console.log(`[${requestId}] Starting detailed quote process`);
+
+            // Step 1: Get quote years and ref
+            const yearsData = await getQuoteYears(functionArgs.state);
+            const quoteRef = yearsData.ref;
+
+            // Store the ref for this conversation
+            quoteReferences[conversation?.id] = quoteRef;
+
+            // Step 2: Get quote plan
+            const planData = await getQuotePlan(
+              quoteRef,
+              functionArgs.model,
+              functionArgs.modelClass,
+              functionArgs.vinPattern,
+              functionArgs.odometer
+            );
+
+            console.log(`[${requestId}] Quote plan data:`, JSON.stringify(planData));
+
+            functionResponse = JSON.stringify({
+              success: true,
+              quoteRef: quoteRef,
+              plan: planData,
+              message: "Quote generated successfully. Present pricing and coverage details to customer."
+            });
+          } else if (functionName === 'create_contract') {
+            // Get the quote ref for this conversation
+            const quoteRef = quoteReferences[conversation?.id];
+
+            if (!quoteRef) {
+              functionResponse = JSON.stringify({
+                error: 'No active quote found. Please get a quote first before creating a contract.'
+              });
+            } else {
+              console.log(`[${requestId}] Creating contract with ref: ${quoteRef}`);
+
+              // For now, just acknowledge - full payment processing would require credit card info
+              functionResponse = JSON.stringify({
+                success: true,
+                message: "To complete your contract, please provide your payment information. We accept all major credit cards.",
+                note: "Contract creation requires payment processing which should be handled securely."
+              });
+            }
           } else {
             functionResponse = JSON.stringify({ error: 'Unknown function' });
           }
         } catch (error) {
+          console.error(`[${requestId}] Error executing function ${functionName}:`, error);
           functionResponse = JSON.stringify({ error: error.message });
         }
 
