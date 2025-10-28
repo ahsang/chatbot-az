@@ -1,0 +1,637 @@
+MBH API Manual 1.1 
+Contents 
+I. General information 
+Headers 
+Endpoints 
+II. API requests 
+Contract 
+Get Contract Info 
+Contract Updates 
+Contract Info 
+Customer Info 
+Finance Info 
+Contract Search Keys 
+Vehicle 
+Get Vehicle Info 
+Update Vehicle Info 
+Vehicle Search Keys 
+Quote 
+Get Quote 
+Deposit 
+III. Appendix 
+Contract Search Keys 
+Response Codes 
+cURL Examples
+I. General Information 
+Headers 
+Every API call needs to include an Authorization header and a Content-Type header. The content type must be set to "application/json". 
+This is an example Authorization header: 
+Authorization: Bearer {"id":"idValue..."} {"key":"keyValue..."} 
+idValue... => MBH assigned ID 
+keyValue... => MBH assigned Key 
+Required parameters will be shown in bold text, while optional parameters will be shown in orange text (unless of course you're orange color blind). Variable parameters are shown as italic placeholders and requie inputed values. 
+Unauthorized or Invalid requests will return a 404 error. 
+Endpoints 
+There are 2 endpoints currently available for processing. 
+Sandbox 
+The sandbox endpoint is for testing. The sandbox database is refreshed each night and changes persist only until the next refresh cycle. 
+https//sandbox.ncwcinc.com/dm 
+this endpoint is for processing requests against the Deal Manager Database 
+https://sandbox.ncwcinc.com/crm 
+this endpoint is for processing against the CRM database 
+The ID for the test sandbox account is "MB1910E6F" and key is "4aad0cb8-a09c-4fce-832f ff6b2e2d754b". NOTE: this entry only exists on the sandbox server. 
+Production 
+https//dapi.ncwcinc.com/dm 
+this endpoint is for processing requests against the Deal Manager Database (NOTE: this URL is temporary until both the Deal Manager and CRM are on the same server)
+https://api.ncwcinc.com/crm 
+this endpoint is for processing against the CRM database
+II. API Requests 
+Contract 
+GET Contract (available on both endpoints) 
+Retrieve information about a contract in the Deal Manager or CRM database. The contract search can be made on the policy number or any of the 2 phone numbers associated with the contract. Note: If searching by phone number, information on more than 1 contract can be returned. 
+Request Contract Information 
+https://api.ncwcinc.com/crm?{parameters} 
+https://dapi.ncwcinc.com/dm?{parameters} 
+Request parameters 
+In the request URL, provide the following query {parameters} with values. 
+Parameter 
+Type 
+Value 
+Description
+search 
+string 
+contract 
+retrieve a contract object
+key 
+string 
+key 
+the key to search on - see Contract Search Keys
+keyValue 
+string 
+key-value 
+the key value to search for
+
+
+
+Example Request (cURL) 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f ff6b2e2d754b"}' --header "Content-Type: application/json" -X GET 
+https://sandbox.ncwcinc.com/crm?search=contract&key=policy&keyValue=COVX000001Example Successful Response 
+[{ 
+ "policy": "COVX000001", 
+ "active": true, 
+ "type": "0", 
+ "customer": { 
+ "name": { 
+ "first": "Fred", 
+ "last": "Flintstone" 
+ }, 
+ "address":"345 Cave Stone Road", 
+ "city": "Bedrock", 
+ "state": "BR", 
+ "zip": "00001", 
+ "phone": { 
+ "primary": "(1) 001", 
+ "secondary": null 
+ }, 
+ "email": "fred@flintstone.rock" 
+ }, 
+ "vehicle": { 
+ "year": 0017, 
+ "make": "Flintmobile", 
+ "model": { "name": "Special Edition", "class": 1 }  "vin": "00100000000000001", 
+ "odometer": "100000" 
+ "verified": true, 
+ "display": 
+ { 
+ "vin_year": 0017, 
+ "vin_make": "Flintmobile", 
+ "vin_model": "Special Edition", 
+ "vin_trim": "SE" 
+ } 
+ }, 
+ "property": { 
+ "address": null, 
+ "city": null, 
+ "state": null, 
+ "zip": null 
+ }, 
+ "finance": { 
+ "monthly": 100.00, 
+ "nexBillDate": "2025-07-04" 
+}] 
+NOTE: the value for nextBillDate will be null for non-active contracts Example Error Response
+{ 
+ "code": "202", 
+ "message": "(COVX000002 not found)" }
+Vehicle 
+GET Vehicle Info (available on both endpoints) 
+Get information about a vehicle 
+VIN lookup 
+https://api.ncwcinc.com/crm?{parameters} 
+https://dapi.ncwcinc.com/dm?{parameters}
+Request parameters 
+In the request URL, provide the following query {parameters} with values. 
+Parameter 
+Type 
+Value 
+Description
+lookup 
+string 
+vehicle 
+retrieve a vehicle object
+key 
+string 
+key 
+the key to search on - see Vehicle Search Keys
+keyValue 
+string 
+key-value 
+the key value to search for
+
+
+
+Example Request (cURL) 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X GET "**https://sandbox.ncwcinc.com/crm? lookup=vehicle&key=vin&keyValue=1G1FH1R7XR0102632" 
+Quote 
+GET Quote (CRM endpoint only) 
+Getting a quote is a multi-step process. 
+The suggested sequence of events is to populate the quote with customer information and post it for furture reference in the event that the remainder of the process is interrupted; then move on to the specifics of the policy (i.e. get the vehicle and or property information and plan); process the deposit and finally mark it as a sale. 
+Note: at any point the customer's state is specified, a check will be make and an error will be returned if the vehicle owner lives in a state that we're not licensed to sell in. If the customer's state is not one we can sell in the process can still continue up to the point of marking it a sale. 
+Request Years 
+https://api.ncwcinc.com/crm?{parameters} 
+Parameters to retrieve a list of available years (optional if using a preloaded list of years) 
+Parameter 
+Type 
+Value 
+Description
+quote 
+string 
+years 
+retrieve a list of available years
+state 
+string 
+st 
+the owners 2 character state code
+
+
+
+Example Request (cURL) 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f ff6b2e2d754b"}' --header "Content-Type: application/json" -X GET "https://api.ncwcinc.com/crm? quote=years&state=NJ"
+Example Successful response 
+{ 
+ "ref": "ebb5c735-0308-4e3c-9aea-8a270aebfe15", 
+ "years": [2025, 2024, ...] 
+} 
+Example Error Response 
+{ 
+ "code": "400", 
+ "message": "we're not licensed to sell in the state: CA" 
+} 
+Request Makes 
+Parameters to retrieve a list vehicle makes 
+Parameter 
+Type 
+Value 
+Description
+quote 
+string 
+makes 
+retrieve a list of available makes
+ref 
+string 
+id
+the reference id returned from the retrieve years request; this parameter is optional if you're using a preloaded list of vehicle years (ref will be returned with the response from this call)
+state 
+string 
+st
+the owners 2 character state code -- this parameter is optional if you made a call to get the list of available years from the API; otherwise it's a mandatory parameter
+year 
+string 
+vehicle‑year 
+vehicle‑year is the selected year
+
+
+
+Example Request (cURL) 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f ff6b2e2d754b"}' --header "Content-Type: application/json" -X GET 
+"https://sandbox.ncwcinc.com/crm?quote=makes&ref=ebb5c735-0308-4e3c-9aea 8a270aebfe15&year=2022"
+Example Successful response 
+{ 
+ "ref": "ebb5c735-0308-4e3c-9aea-8a270aebfe15", 
+ "makes": ["Chevrolet", "Chrysler", ...] 
+} 
+Example Error Response 
+{ 
+ "code": 400, 
+ "message": "we're not licensed to sell in the state: CA" 
+} 
+This error will only occur if you are using a preloaded list of year and have included the state parameter. 
+Request Models 
+Parameters to list available models 
+Parameter 
+Type 
+Value 
+Description
+quote 
+string 
+models 
+retrieve a list of available models
+ref 
+string 
+id 
+the reference id
+make 
+string 
+vehicle-make 
+vehicle-make is the selected make
+
+
+
+Example Request (cURL) 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f ff6b2e2d754b"}' --header "Content-Type: application/json" -X GET 
+"https://sandbox.ncwcinc.com/crm?quote=models&ref=ebb5c735-0308-4e3c-9aea 8a270aebfe15&make=Ford"
+Example Successful response 
+{ 
+ "ref": "ebb5c735-0308-4e3c-9aea-8a270aebfe15", 
+ "models": [{ 
+ "name": "Bronco", 
+ "trim": "Badlands Advanced", 
+ "class": "3", 
+ "vinPattern": "1FMDE5CHNL" 
+ }, { 
+ "name": "Bronco", 
+ "trim": "Base", 
+ "class": "3", 
+ "vinPattern": "1FMDE5AHNL" 
+ }, { 
+ "name": "Bronco", 
+ "trim": "Base Advanced", 
+ "class": "3", 
+ "vinPattern": "1FMDE5CHNL" 
+ }, { 
+ "name": "Bronco", 
+ "trim": "Big Bend", 
+ "class": "3", 
+ "vinPattern": "1FMDE5AHNL" 
+ }, { 
+ "name": "Bronco", 
+ "trim": "Big Bend Advanced", 
+ "class": "3", 
+ "vinPattern": "1FMDE5CHNL" 
+ }, { 
+ "name": "Bronco", 
+ "trim": "Black Diamond, 
+ "class": "3", 
+ "vinPattern": "1FMDE5AHNL" 
+ } 
+ . 
+ . 
+ . 
+ ] 
+} 
+Request Plans 
+This function (currently) will only return the highest coverage plan available or an error if no plans are available for the vehicle.. 
+Parameters to list available plans 
+Parameter 
+Type 
+Value 
+Description
+quote 
+string 
+plan 
+retrieve a qualifying contract plan
+ref 
+string 
+id 
+the reference id
+model 
+string 
+model-name 
+the selected models name
+class 
+number 
+model-class 
+the selected models class
+vinPattern 
+string 
+model-vinPattern 
+the selected models VIN pattern
+odometer 
+number 
+nnnn 
+the current odometer reading - numbers only
+
+
+
+Example Request (cURL) 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f ff6b2e2d754b"}' --header "Content-Type: application/json" -X GET 
+"https://sandbox.ncwcinc.com/crm?quote=plan&ref=ebb5c735-0308-4e3c-9aea 8a270aebfe15&model=F150%20XL&class=2&vinPattern=1FTFW1EDNF&odometer=12345"
+Example Successful response 
+{ 
+["ebb5c735-0308-4e3c-9aea-8a270aebfe15", {  "product": { 
+ "id": 4, 
+ "description": "Executive", 
+ "monthToMonth": true, 
+ "retail": 0, 
+ "deductible": 200, 
+ "minimum": 118, 
+ "offset": 40, 
+ "maxOdometer": 40000, 
+ "options": null, 
+ "sample": "M2M_VSC_EXEC_NW_01312024.pdf"  }, 
+ "finance": { 
+ "deposit": 0, 
+ "monthly": 118, 
+ "term": 24 
+ }, 
+ "options": { 
+ "2": { 
+ "DIESEL": { 
+ "id": 1, 
+ "class": "VSC", 
+ "type": 1, 
+ "sku": "DIESEL", 
+ "description": "Diesel Surcharge",  "manualSelection": false,  "price": 0, 
+ "msrp": 0, 
+ "markup": 0 
+ }, 
+ "LKIT": { 
+ "id": 2, 
+ "class": "VSC", 
+ "type": 1, 
+ "sku": "LKIT", 
+ "description": "Lift Kit",  "manualSelection": true,  "price": 5,
+ "msrp": 5, 
+ "markup": 0 
+ }, 
+ "RSHARE": { 
+ "id": 3, 
+ "class": "VSC", 
+ "type": 1, 
+ "sku": "RSHARE", 
+ "description": "Ride Share",  "manualSelection": true,  "price": 10, 
+ "msrp": 10, 
+ "markup": 0 
+ }, 
+ "AWD": { 
+ "id": 4, 
+ "class": "VSC", 
+ "type": 1, 
+ "sku": "AWD", 
+ "description": "4X4\/AWD Surcharge",  "manualSelection": false,  "price": 0, 
+ "msrp": 0, 
+ "markup": 0 
+ } 
+ } 
+ } 
+ } 
+] 
+Example Error Response 
+ "code":202, 
+ "message":"(no plans are available for this vehicle)"
+PUT Quote 
+Request 
+https://sandbox.ncwcinc.com/crm/quote 
+Payload 
+NOTE: "ref", "policy", "vehicle", and "property" are optional if you're saving customer information not associated with a vehicle or property; otherwise they are required.
+The "*ref" value will always be returned for use in subsequent API calls; otherwise it's required if the quote process starts with vehicle or property selection. 
+Example Request (cURL) 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"ebb5c735-0308-4e3c-9aea-8a270aebfe15"}' --header "Content-Type: application/json" -X PUT "https://sandbox.ncwcinc.com/crm/quote" -T "quote.json" 
+Contents of example file "quote.json" 
+{ 
+ "ref": "ebb5c735-0308-4e3c-9aea-8a270aebfe15", 
+ "customer": 
+ { 
+ "name": { "first": "George", "last": "Jetson" }, 
+ "phone": { "primary": "9991999199", "alternate": "8889889999" },  "email": "gjetson@spacely_space_sprockets.com", 
+ "address": { "primary": "Skypad Apartments", "secondary": "Apt 104" },  "city": "Orbit City", 
+ "state": "ST", 
+ "zip": "99999", 
+ "zip4": null 
+ }, 
+ "policy": 
+ { 
+ "product": { "id": 4 }, 
+ "monthly": "108", 
+ "deductible": "200" 
+ }, 
+ "vehicle": 
+ { 
+ "class": "3", 
+ "odometer": "12500", 
+ "year": "2022", 
+ "make": "Ford", 
+ "model": "F-150", 
+ "vin": { "vin": "1FTFW1ED4NF000000" }, 
+ "surcharges": {} 
+ } 
+} 
+Example Successful response 
+{ 
+ "ref": "ebb5c735-0308-4e3c-9aea-8a270aebfe15" 
+} 
+Note: the property object is included for reference only proactive to the possibility of offering home service contracts via this service. At present the property value should be transmitted as null
+POST request to process a Deposit 
+Requirements for the deposit method: 
+Credit Card Information 
+Request 
+https://sandbox.ncwcinc.com/crm/deposit
+Payload for card holder same as the customer NOTE: the value ***customer*** is necessary to denote the customer information is to be used as the card holder. 
+
+
+Parameter 
+Type 
+Value 
+Description 
+ref 
+string 
+id 
+the 
+reference id
+paytype 
+string 
+cc
+process a 
+credit card
+cc 
+object
+Parameter Type Value 
+holder string ***customer*** pan string cc number 
+expiration string exp date 
+cvv string cvv
+credit card 
+information
+amount 
+number 
+amount 
+the amount 
+to process
+
+
+
+Example 
+{ 
+ "ref": "ebb5c735-0308-4e3c-9aea-8a270aebfe15", 
+ "payType": "cc", 
+ "cc": 
+ { 
+ "holder": "***customer***", 
+Notes 
+curently o credit card are accep 
+the system will proces deposit 
+without a CVV, but having on recommen 
+the amoun can be 
+specified w or without decimal p 
+
+ "pan": "4111111111111111", 
+ "expiration": "02/25", 
+ "cvv": "123" 
+ }, 
+ "amount": "108.00" 
+} 
+Payload for card holder different than the customer 
+Parameter 
+Type 
+Value 
+Description
+ref 
+string 
+id 
+the 
+reference id
+paytype 
+string 
+cc
+process a 
+credit card
+cc 
+object
+Parameter Type Value Description 
+card 
+holder string name 
+holder's 
+fullname 
+card 
+address object address 
+holder's 
+address 
+city string city 
+2 character 
+state string state 
+state 
+abbreviation 
+zip string zip ZIP code
+
+
+pan 
+string 
+cc number
+
+
+expiration 
+string 
+exp date 
+mm/yy or 
+mm/yyyy
+cvv 
+string 
+cvv
+
+
+
+
+
+amount number amount the amount to process the amount can be specified with or without a decimal point 
+Error Responses
+{ 
+ "code":202, 
+ "message": 
+ { 
+ "code":"process error", 
+ "message":"deposit already taken" 
+ } 
+} 
+{ 
+ "code":202, 
+ "message": 
+ { 
+ "code":"process error", 
+ "message":"missing product information" 
+ } 
+} 
+Example Request (cURL) 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"ebb5c735-0308-4e3c-9aea-8a270aebfe15"}' --header "Content-Type: application/json" -X POST "https://://sandbox.ncwcinc.com/crm/deposit" -T "deposit.json" 
+Contents of example file "deposit.json'" 
+{ 
+ "ref": "ebb5c735-0308-4e3c-9aea-8a270aebfe15", 
+ "payType": "cc", 
+ "cc": 
+ { 
+ "holder": "Judy Jetson", 
+ "address": "RockedPad Apartments", 
+ "city": "Cloud City", 
+ "state": "ST", 
+ "zip": "98999", 
+ "pan": "4111111111111111", 
+ "expiration": "02/25", 
+ "cvv": "123" 
+ }, 
+ "amount": "108.00" 
+}
+Example Successful response 
+{ 
+ "transaction": 
+ { 
+ "status": "A", 
+ "reference": "1234567" 
+ } 
+} 
+Example Error Response 
+{ 
+ "code": "202", 
+ "message": 
+ { 
+ "code": "D: 17", 
+ "error": "D: Declined - Credit card has expired.  } 
+}
+POST request to add a Contract to the the database https://sandbox.ncwcinc.com/dm/save-contract
+III. Appendix 
+Contract Search Keys 
+policy - search by policy number; the key value is the policy number 
+phone - search by phone number; the key value is the phone number 
+Vehicle Search Keys 
+vin - search by VIN; the key value is the VIN of the vehicle 
+HTTP Response Codes 
+http 200 - the request was successful and the returned payload has the result data http 202 - the record was not found; the error response message has more information http 400 - there was an error processing the request; the error response message has more information
+The response codes are also returned with the error message 
+cURL Examples 
+Post Quote 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X POST -d "@post.txt" 
+https://sandbox.ncwcinc.com/crm/quote 
+Contents of "post.txt" 
+{"customer":{"name":{"first":"George","last":"Jetson"},"phone": 
+{"primary":"9991999199","alternate":"8889889999"},"email":"gjetson@spacely_space_sproc kets.com","address":{"primary":"Skypad Apartments","secondary":"Apt 104"},"city":"Orbit City","state":"ST","zip":"99999","zip4":null},"policy": {"sku":"MBHESSL","monthly":"108","deductible":"200"},"vehicle": 
+{"class":"3","odometer":"12500","year":"2022","make":"Ford","model":"F 150","vin_pattern":"1FTFW1EDNF","vin":"1FTFW1ED4NF000000","surcharges": {}},"property":null} 
+Process Sale (in sequence) 
+parameter ref => reference returned via GET years 
+get years 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X GET "https://sandbox.ncwcinc.com/crm? quote=years&state=NJ" 
+get makes 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X GET "https://sandbox.ncwcinc.com/crm?quote=makes&ref= {ref}&year=2022" 
+get models 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X GET "https://sandbox.ncwcinc.com/crm?quote=models&ref= {ref}&make=Ford" 
+get plan 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X GET "https://sandbox.ncwcinc.com/crm?quote=plan&ref= {ref}&model=F150%20XL&class=2&vinPattern=1FTFW1EDNF&odometer=12345" 
+update quote 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X PUT "https://sandbox.ncwcinc.com/crm/quote" -d '{"ref":" {ref}","customer":{"name":{"first":"George","last":"Jetson"},"phone": 
+{"primary":"9991999199","alternate":"8889889999"},"email":"gjetson@spacely_space_sprockets.com","add ress":{"primary":"Skypad Apartments","secondary":"Apt 104"},"city":"Orbit 
+City","state":"ST","zip":"99999","zip4":null},"policy":{"product": 
+{"id":4},"monthly":"108","deductible":"200"},"vehicle": 
+{"class":"3","odometer":"12500","year":"2022","make":"Ford","model":"F-150","vin": {"pattern":"1FTFW1EDNF","vin":"1FTFW1ED4NF000000"},"surcharges":{}}}' 
+process a deposit with valid CC 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X POST "https://sandbox.ncwcinc.com/crm/deposit" -d '{"ref": " {ref}","payType": "cc","cc": {"holder": "Jane Jetson", "pan": "4111111111111111", "expiration": "12/29", "cvv": "222" },"amount": 168}' 
+try at taking a deposit with an expired CC 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X POST "https://sandbox.ncwcinc.com/crm/deposit" -d '{"ref": "
+{ref}","payType": "cc","cc": {"holder": "Jane Jetson", "pan": "4111111111111111", "expiration": "12/22", "cvv": "222" },"amount": 168}' 
+another try at taking a deposit, fail with error 
+curl --header 'Authorization: Bearer {"id":"MB1910E6F","key":"4aad0cb8-a09c-4fce-832f-ff6b2e2d754b"}' -- header "Content-Type: application/json" -X POST "https://sandbox.ncwcinc.com/crm/deposit" -d '{"ref": " {ref}","payType": "cc","cc": {"holder": "Jane Jetson", "pan": "4111111111111111", "expiration": "12/29", "cvv": "222" },"amount": 168}'

@@ -41,16 +41,24 @@ The entire application is contained in `index.js` (430 lines). This is a simple 
 - Properly stores tool calls, tool responses, and assistant messages
 - Lost on server restart
 
-**OpenAI Function Calling Tools** (lines 182-221):
-Two tools defined for vehicle data lookup:
-1. `get_vehicle_makes(year)` - Fetches all available makes for a given year
-2. `get_vehicle_models(year, make)` - Fetches all models for a year/make combination
+**OpenAI Function Calling Tools**:
+Three tools defined for the complete quote and contract flow:
+1. `get_vehicle_makes(year, state)` - Fetches all available makes for a given year using MBH API
+2. `get_vehicle_models(make, state)` - Fetches all models with trim, class, and VIN pattern using MBH API
+3. `get_detailed_quote(state, year, make, model, trim, modelClass, vinPattern, odometer)` - Generates real insurance quote with pricing
+4. `create_contract(customer info, vin, payment info)` - Creates contract: submits quote, processes deposit, saves to Deal Manager
 
-**CoverageX API Integration** (lines 56-79):
-- Base URL: `https://coveragex.com/api`
-- `getMakesForYear(year)` - GET `/years/{year}/makes?ref={ref}`
-- `getModelsForMake(year, make)` - GET `/years/{year}/makes/{make}/models?ref={ref}`
-- Uses API reference token from environment
+**MBH API Integration**:
+- Base URL: `https://sandbox.ncwcinc.com/crm` (sandbox) or `https://api.ncwcinc.com/crm` (production)
+- Authentication: Bearer token with JSON format `{"id":"...", "key":"..."}`
+- Quote flow maintains a `ref` (reference ID) throughout the entire process
+- `getQuoteYears(state)` - GET `?quote=years&state={state}` - Returns ref + years
+- `getQuoteMakes(ref, year)` - GET `?quote=makes&ref={ref}&year={year}` - Returns makes list
+- `getQuoteModels(ref, make)` - GET `?quote=models&ref={ref}&make={make}` - Returns models with trim/class/vinPattern
+- `getQuotePlan(ref, model, class, vinPattern, odometer)` - GET `?quote=plan&ref={ref}&model={model}&class={class}&vinPattern={vinPattern}&odometer={odometer}` - Returns pricing and product details
+- `submitQuote(quoteData)` - PUT `/quote` - Submits customer/vehicle/policy data
+- `processDeposit(depositData)` - POST `/deposit` - Processes credit card payment
+- `saveContract()` - POST `/dm/save-contract` - Finalizes contract in Deal Manager
 
 **System Prompt** (lines 132-179):
 - CoverageX sales assistant persona
@@ -74,10 +82,14 @@ Two tools defined for vehicle data lookup:
 4. Retrieve conversation history (last 20 messages, including tool calls)
 5. Build messages array: system prompt + history + current message
 6. Call OpenAI API with tools
-7. **Tool Execution Loop** (lines 254-327):
+7. **Tool Execution Loop**:
    - If assistant requests tool calls, execute them
    - Store assistant message with tool_calls
-   - Execute each function (get_vehicle_makes or get_vehicle_models)
+   - Execute each function:
+     - `get_vehicle_makes`: Gets years+ref from MBH, then gets makes list, stores ref
+     - `get_vehicle_models`: Uses stored ref to get models with trim/class/VIN pattern
+     - `get_detailed_quote`: Gets or reuses ref, calls getQuotePlan, stores all quote data
+     - `create_contract`: Submits quote → processes deposit → saves contract
    - Store tool responses with tool_call_id
    - Call OpenAI again with tool results
    - Repeat until no more tool calls
@@ -110,10 +122,12 @@ Required variables:
 - `OPENAI_API_KEY` - OpenAI API key
 - `CHATWOOT_API_KEY` - Chatwoot API access token
 - `CHATWOOT_BASE_URL` - Chatwoot instance URL
+- `MBH_API_ID` - MBH assigned ID for API authentication
+- `MBH_API_KEY` - MBH assigned key for API authentication
 
 Optional (with defaults):
 - `CHATWOOT_TYPING_API_KEY` - Dedicated API key for typing indicator (falls back to `CHATWOOT_API_KEY` if not set)
-- `COVERAGEX_API_REF` - Default: `1f0aad9b-1372-636e-bab7-000d3a8ab96a` (API reference token)
+- `MBH_API_BASE` - Default: `https://sandbox.ncwcinc.com/crm` (use `https://api.ncwcinc.com/crm` for production)
 - `SYSTEM_PROMPT` - Default: CoverageX sales assistant prompt in index.js
 - `OPENAI_MODEL` - Default: `gpt-4o-mini`
 - `TEMPERATURE` - Default: `0.7`
@@ -124,12 +138,18 @@ Optional (with defaults):
 
 ## Important Technical Details
 
-### Conversation History Limitations
+### In-Memory Storage Limitations
+**Conversation History:**
 - **Not persistent** - stored in memory only
 - **Lost on restart** - no database or file persistence
 - **20 message limit** - only recent context retained (increased to handle tool calls)
 - **Per conversation** - indexed by `conversation.id`
 - **Tool call metadata** - stores tool_calls, tool_call_id, and name for proper function calling flow
+
+**Quote Data Storage:**
+- `quoteReferences` - Stores MBH API reference IDs per conversation (needed for entire quote flow)
+- `quoteData` - Stores vehicle/plan information for contract creation
+- Both lost on server restart - consider Redis/database for production
 
 ### Logging
 When enabled, creates `logs/YYYY-MM-DD.jsonl` files with:
@@ -142,22 +162,24 @@ When enabled, creates `logs/YYYY-MM-DD.jsonl` files with:
 **Chatwoot REST API v1:**
 - `POST /api/v1/accounts/{account_id}/conversations/{conversation_id}/messages` - Send messages
 - `POST /api/v1/accounts/{account_id}/conversations/{conversation_id}/toggle_status` - Update status
+- `POST /api/v1/accounts/{account_id}/conversations/{conversation_id}/toggle_typing_status` - Typing indicator
 
-**CoverageX API:**
-- Base: `https://coveragex.com/api`
-- `GET /years/{year}/makes?ref={ref}` - Get all makes for a year
-- `GET /years/{year}/makes/{make}/models?ref={ref}` - Get all models for year/make
-- No authentication required (uses ref parameter)
-- Returns JSON arrays of vehicle data
+**MBH API:**
+- Base: `https://sandbox.ncwcinc.com/crm` (sandbox) or `https://api.ncwcinc.com/crm` (production)
+- Authentication: Bearer token with JSON format `Bearer {"id":"ID","key":"KEY"}`
+- All endpoints use query parameters
+- Complete quote flow documented in `api-manual.txt`
 
 ### OpenAI Function Calling Architecture
-The bot uses OpenAI's function calling feature to dynamically fetch vehicle data:
+The bot uses OpenAI's function calling feature for the complete quote-to-contract flow:
 1. AI decides when to call tools based on conversation context
-2. When year is mentioned, calls `get_vehicle_makes`
-3. When year+make are mentioned, calls `get_vehicle_models`
-4. Multiple tool calls can occur in sequence
-5. Tool responses are fed back to the AI for natural language presentation
-6. Conversation history preserves entire tool call chain
+2. When year+state mentioned, calls `get_vehicle_makes` (internally: getQuoteYears → getQuoteMakes)
+3. When make mentioned, calls `get_vehicle_models` (internally: getQuoteModels with stored ref)
+4. When all vehicle details collected, calls `get_detailed_quote` (internally: getQuotePlan)
+5. When customer agrees and provides payment, calls `create_contract` (internally: submitQuote → processDeposit → saveContract)
+6. Multiple tool calls can occur in sequence
+7. Tool responses are fed back to the AI for natural language presentation
+8. Conversation history preserves entire tool call chain
 
 ## Chatwoot Webhook Setup
 
