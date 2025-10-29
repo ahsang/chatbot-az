@@ -196,24 +196,36 @@ async function getQuotePlan(ref, model, modelClass, vinPattern, odometer) {
 
 async function submitQuote(quoteData) {
   try {
+    console.log(`[MBH API] Submitting quote to: ${MBH_API_BASE}/quote`);
     const response = await axios.put(`${MBH_API_BASE}/quote`, quoteData, {
       headers: getMBHHeaders()
     });
+    console.log(`[MBH API] Quote submission status: ${response.status}`);
     return response.data;
   } catch (error) {
-    console.error(`Error submitting quote:`, error.message);
+    console.error(`[MBH API] Error submitting quote:`, error.message);
+    if (error.response) {
+      console.error(`[MBH API] Response status: ${error.response.status}`);
+      console.error(`[MBH API] Response data:`, JSON.stringify(error.response.data, null, 2));
+    }
     throw error;
   }
 }
 
 async function processDeposit(depositData) {
   try {
+    console.log(`[MBH API] Processing deposit to: ${MBH_API_BASE}/deposit`);
     const response = await axios.post(`${MBH_API_BASE}/deposit`, depositData, {
       headers: getMBHHeaders()
     });
+    console.log(`[MBH API] Deposit processing status: ${response.status}`);
     return response.data;
   } catch (error) {
-    console.error(`Error processing deposit:`, error.message);
+    console.error(`[MBH API] Error processing deposit:`, error.message);
+    if (error.response) {
+      console.error(`[MBH API] Response status: ${error.response.status}`);
+      console.error(`[MBH API] Response data:`, JSON.stringify(error.response.data, null, 2));
+    }
     throw error;
   }
 }
@@ -222,12 +234,18 @@ async function saveContract() {
   try {
     // Note: Using /dm endpoint for save-contract as per API manual
     const dmEndpoint = MBH_API_BASE.replace('/crm', '/dm');
+    console.log(`[MBH API] Saving contract to Deal Manager: ${dmEndpoint}/save-contract`);
     const response = await axios.post(`${dmEndpoint}/save-contract`, {}, {
       headers: getMBHHeaders()
     });
+    console.log(`[MBH API] Contract save status: ${response.status}`);
     return response.data;
   } catch (error) {
-    console.error(`Error saving contract:`, error.message);
+    console.error(`[MBH API] Error saving contract:`, error.message);
+    if (error.response) {
+      console.error(`[MBH API] Response status: ${error.response.status}`);
+      console.error(`[MBH API] Response data:`, JSON.stringify(error.response.data, null, 2));
+    }
     throw error;
   }
 }
@@ -725,8 +743,11 @@ Always keep your responses less than 150 words
                   }
                 };
 
-                console.log(`[${requestId}] Submitting quote:`, JSON.stringify(quotePayload));
-                await submitQuote(quotePayload);
+                console.log(`[${requestId}] ========== STEP 1: SUBMITTING QUOTE ==========`);
+                console.log(`[${requestId}] Quote payload:`, JSON.stringify(quotePayload, null, 2));
+                const quoteResult = await submitQuote(quotePayload);
+                console.log(`[${requestId}] Quote submission response:`, JSON.stringify(quoteResult, null, 2));
+                console.log(`[${requestId}] Quote submitted successfully! ✓`);
 
                 // Step 2: Process deposit
                 const depositPayload = {
@@ -741,12 +762,21 @@ Always keep your responses less than 150 words
                   amount: storedQuote.plan.finance?.monthly || 118
                 };
 
-                console.log(`[${requestId}] Processing deposit for amount: ${depositPayload.amount}`);
+                console.log(`[${requestId}] ========== STEP 2: PROCESSING DEPOSIT ==========`);
+                console.log(`[${requestId}] Deposit amount: $${depositPayload.amount}`);
+                console.log(`[${requestId}] Payment type: ${depositPayload.payType}`);
+                console.log(`[${requestId}] Card holder: ${depositPayload.cc.holder}`);
                 const depositResult = await processDeposit(depositPayload);
+                console.log(`[${requestId}] Deposit processing response:`, JSON.stringify(depositResult, null, 2));
+                console.log(`[${requestId}] Deposit processed successfully! ✓`);
+                console.log(`[${requestId}] Transaction ID: ${depositResult.transaction || 'N/A'}`);
 
                 // Step 3: Save contract
-                console.log(`[${requestId}] Saving contract to Deal Manager`);
+                console.log(`[${requestId}] ========== STEP 3: SAVING CONTRACT TO DEAL MANAGER ==========`);
                 const contractResult = await saveContract();
+                console.log(`[${requestId}] Deal Manager save response:`, JSON.stringify(contractResult, null, 2));
+                console.log(`[${requestId}] Contract saved successfully! ✓`);
+                console.log(`[${requestId}] ========== CONTRACT CREATION COMPLETE ==========`);
 
                 functionResponse = JSON.stringify({
                   success: true,
@@ -760,7 +790,16 @@ Always keep your responses less than 150 words
                   }
                 });
               } catch (error) {
-                console.error(`[${requestId}] Error creating contract:`, error);
+                console.error(`[${requestId}] ========== CONTRACT CREATION FAILED ==========`);
+                console.error(`[${requestId}] Error message:`, error.message);
+                console.error(`[${requestId}] Error stack:`, error.stack);
+                if (error.response) {
+                  console.error(`[${requestId}] API Response status:`, error.response.status);
+                  console.error(`[${requestId}] API Response headers:`, JSON.stringify(error.response.headers, null, 2));
+                  console.error(`[${requestId}] API Response data:`, JSON.stringify(error.response.data, null, 2));
+                }
+                console.error(`[${requestId}] ========================================`);
+
                 functionResponse = JSON.stringify({
                   error: 'Contract creation failed: ' + error.message,
                   details: error.response?.data || error.message
